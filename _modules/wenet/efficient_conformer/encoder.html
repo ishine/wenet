@@ -10,7 +10,8 @@
     <script src="../../../_static/js/html5shiv.min.js"></script>
   <![endif]-->
   
-        <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+        <script src="../../../_static/jquery.js"></script>
+        <script src="../../../_static/_sphinx_javascript_frameworks_compat.js"></script>
         <script data-url_root="../../../" id="documentation_options" src="../../../_static/documentation_options.js"></script>
         <script src="../../../_static/doctools.js"></script>
         <script src="../../../_static/sphinx_highlight.js"></script>
@@ -95,7 +96,6 @@
 
 <span class="kn">import</span> <span class="nn">torch</span>
 <span class="kn">import</span> <span class="nn">logging</span>
-<span class="kn">from</span> <span class="nn">typeguard</span> <span class="kn">import</span> <span class="n">check_argument_types</span>
 <span class="kn">import</span> <span class="nn">torch.nn.functional</span> <span class="k">as</span> <span class="nn">F</span>
 
 <span class="kn">from</span> <span class="nn">wenet.transformer.positionwise_feed_forward</span> <span class="kn">import</span> <span class="n">PositionwiseFeedForward</span>
@@ -135,7 +135,6 @@
         <span class="n">input_layer</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;conv2d&quot;</span><span class="p">,</span>
         <span class="n">pos_enc_layer_type</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;rel_pos&quot;</span><span class="p">,</span>
         <span class="n">normalize_before</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
-        <span class="n">concat_after</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
         <span class="n">static_chunk_size</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">0</span><span class="p">,</span>
         <span class="n">use_dynamic_chunk</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
         <span class="n">global_cmvn</span><span class="p">:</span> <span class="n">torch</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">Module</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
@@ -169,7 +168,6 @@
 <span class="sd">            group_size (int): group size of every GroupedAttention layer</span>
 <span class="sd">            stride_kernel (bool): default True. True: recompute cnn kernels with stride.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
-        <span class="k">assert</span> <span class="n">check_argument_types</span><span class="p">()</span>
         <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_output_size</span> <span class="o">=</span> <span class="n">output_size</span>
 
@@ -295,7 +293,6 @@
                         <span class="n">count_include_pad</span><span class="o">=</span><span class="kc">False</span><span class="p">),</span>   <span class="c1"># pointwise_conv_layer</span>
                     <span class="n">dropout_rate</span><span class="p">,</span>
                     <span class="n">normalize_before</span><span class="p">,</span>
-                    <span class="n">concat_after</span><span class="p">,</span>
                 <span class="p">))</span>
                 <span class="n">index</span> <span class="o">=</span> <span class="n">index</span> <span class="o">+</span> <span class="mi">1</span>
             <span class="k">else</span><span class="p">:</span>
@@ -313,7 +310,6 @@
                         <span class="o">*</span><span class="n">convolution_layer_args_normal</span><span class="p">)</span> <span class="k">if</span> <span class="n">use_cnn_module</span> <span class="k">else</span> <span class="kc">None</span><span class="p">,</span>
                     <span class="n">dropout_rate</span><span class="p">,</span>
                     <span class="n">normalize_before</span><span class="p">,</span>
-                    <span class="n">concat_after</span><span class="p">,</span>
                 <span class="p">))</span>
 
         <span class="bp">self</span><span class="o">.</span><span class="n">encoders</span> <span class="o">=</span> <span class="n">torch</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">ModuleList</span><span class="p">(</span><span class="n">layers</span><span class="p">)</span>

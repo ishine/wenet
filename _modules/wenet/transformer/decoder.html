@@ -10,7 +10,8 @@
     <script src="../../../_static/js/html5shiv.min.js"></script>
   <![endif]-->
   
-        <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+        <script src="../../../_static/jquery.js"></script>
+        <script src="../../../_static/_sphinx_javascript_frameworks_compat.js"></script>
         <script data-url_root="../../../" id="documentation_options" src="../../../_static/documentation_options.js"></script>
         <script src="../../../_static/doctools.js"></script>
         <script src="../../../_static/sphinx_highlight.js"></script>
@@ -86,16 +87,15 @@
 <span class="c1"># See the License for the specific language governing permissions and</span>
 <span class="c1"># limitations under the License.</span>
 <span class="c1"># Modified from ESPnet(https://github.com/espnet/espnet)</span>
-
 <span class="sd">&quot;&quot;&quot;Decoder definition.&quot;&quot;&quot;</span>
 <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">Tuple</span><span class="p">,</span> <span class="n">List</span><span class="p">,</span> <span class="n">Optional</span>
 
 <span class="kn">import</span> <span class="nn">torch</span>
-<span class="kn">from</span> <span class="nn">typeguard</span> <span class="kn">import</span> <span class="n">check_argument_types</span>
 
 <span class="kn">from</span> <span class="nn">wenet.transformer.attention</span> <span class="kn">import</span> <span class="n">MultiHeadedAttention</span>
 <span class="kn">from</span> <span class="nn">wenet.transformer.decoder_layer</span> <span class="kn">import</span> <span class="n">DecoderLayer</span>
 <span class="kn">from</span> <span class="nn">wenet.transformer.embedding</span> <span class="kn">import</span> <span class="n">PositionalEncoding</span>
+<span class="kn">from</span> <span class="nn">wenet.transformer.embedding</span> <span class="kn">import</span> <span class="n">NoPositionalEncoding</span>
 <span class="kn">from</span> <span class="nn">wenet.transformer.positionwise_feed_forward</span> <span class="kn">import</span> <span class="n">PositionwiseFeedForward</span>
 <span class="kn">from</span> <span class="nn">wenet.utils.mask</span> <span class="kn">import</span> <span class="p">(</span><span class="n">subsequent_mask</span><span class="p">,</span> <span class="n">make_pad_mask</span><span class="p">)</span>
 
@@ -116,10 +116,10 @@
 <span class="sd">        normalize_before:</span>
 <span class="sd">            True: use layer_norm before each sub-block of a layer.</span>
 <span class="sd">            False: use layer_norm after each sub-block of a layer.</span>
-<span class="sd">        concat_after: whether to concat attention layer&#39;s input and output</span>
-<span class="sd">            True: x -&gt; x + linear(concat(x, att(x)))</span>
-<span class="sd">            False: x -&gt; x + att(x)</span>
+<span class="sd">        src_attention: if false, encoder-decoder cross attention is not</span>
+<span class="sd">                       applied, such as CIF model</span>
 <span class="sd">    &quot;&quot;&quot;</span>
+
     <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
         <span class="n">vocab_size</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
@@ -134,9 +134,8 @@
         <span class="n">input_layer</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;embed&quot;</span><span class="p">,</span>
         <span class="n">use_output_layer</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
         <span class="n">normalize_before</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
-        <span class="n">concat_after</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+        <span class="n">src_attention</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
     <span class="p">):</span>
-        <span class="k">assert</span> <span class="n">check_argument_types</span><span class="p">()</span>
         <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
         <span class="n">attention_dim</span> <span class="o">=</span> <span class="n">encoder_output_size</span>
 
@@ -145,6 +144,9 @@
                 <span class="n">torch</span><span class="o">.</span><span class="n">nn</span><span class="o">.</span><span class="n">Embedding</span><span class="p">(</span><span class="n">vocab_size</span><span class="p">,</span> <span class="n">attention_dim</span><span class="p">),</span>
                 <span class="n">PositionalEncoding</span><span class="p">(</span><span class="n">attention_dim</span><span class="p">,</span> <span class="n">positional_dropout_rate</span><span class="p">),</span>
             <span class="p">)</span>
+        <span class="k">elif</span> <span class="n">input_layer</span> <span class="o">==</span> <span class="s1">&#39;none&#39;</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">embed</span> <span class="o">=</span> <span class="n">NoPositionalEncoding</span><span class="p">(</span><span class="n">attention_dim</span><span class="p">,</span>
+                                              <span class="n">positional_dropout_rate</span><span class="p">)</span>
         <span class="k">else</span><span class="p">:</span>
             <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;only &#39;embed&#39; is supported: </span><span class="si">{</span><span class="n">input_layer</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
 
@@ -159,12 +161,12 @@
                 <span class="n">MultiHeadedAttention</span><span class="p">(</span><span class="n">attention_heads</span><span class="p">,</span> <span class="n">attention_dim</span><span class="p">,</span>
                                      <span class="n">self_attention_dropout_rate</span><span class="p">),</span>
                 <span class="n">MultiHeadedAttention</span><span class="p">(</span><span class="n">attention_heads</span><span class="p">,</span> <span class="n">attention_dim</span><span class="p">,</span>
-                                     <span class="n">src_attention_dropout_rate</span><span class="p">),</span>
+                                     <span class="n">src_attention_dropout_rate</span><span class="p">)</span>
+                <span class="k">if</span> <span class="n">src_attention</span> <span class="k">else</span> <span class="kc">None</span><span class="p">,</span>
                 <span class="n">PositionwiseFeedForward</span><span class="p">(</span><span class="n">attention_dim</span><span class="p">,</span> <span class="n">linear_units</span><span class="p">,</span>
                                         <span class="n">dropout_rate</span><span class="p">),</span>
                 <span class="n">dropout_rate</span><span class="p">,</span>
                 <span class="n">normalize_before</span><span class="p">,</span>
-                <span class="n">concat_after</span><span class="p">,</span>
             <span class="p">)</span> <span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">num_blocks</span><span class="p">)</span>
         <span class="p">])</span>
 
@@ -276,10 +278,8 @@
 <span class="sd">        normalize_before:</span>
 <span class="sd">            True: use layer_norm before each sub-block of a layer.</span>
 <span class="sd">            False: use layer_norm after each sub-block of a layer.</span>
-<span class="sd">        concat_after: whether to concat attention layer&#39;s input and output</span>
-<span class="sd">            True: x -&gt; x + linear(concat(x, att(x)))</span>
-<span class="sd">            False: x -&gt; x + att(x)</span>
 <span class="sd">    &quot;&quot;&quot;</span>
+
     <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
         <span class="n">vocab_size</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
@@ -295,22 +295,20 @@
         <span class="n">input_layer</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;embed&quot;</span><span class="p">,</span>
         <span class="n">use_output_layer</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
         <span class="n">normalize_before</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
-        <span class="n">concat_after</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
     <span class="p">):</span>
 
-        <span class="k">assert</span> <span class="n">check_argument_types</span><span class="p">()</span>
         <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">left_decoder</span> <span class="o">=</span> <span class="n">TransformerDecoder</span><span class="p">(</span>
             <span class="n">vocab_size</span><span class="p">,</span> <span class="n">encoder_output_size</span><span class="p">,</span> <span class="n">attention_heads</span><span class="p">,</span> <span class="n">linear_units</span><span class="p">,</span>
             <span class="n">num_blocks</span><span class="p">,</span> <span class="n">dropout_rate</span><span class="p">,</span> <span class="n">positional_dropout_rate</span><span class="p">,</span>
             <span class="n">self_attention_dropout_rate</span><span class="p">,</span> <span class="n">src_attention_dropout_rate</span><span class="p">,</span>
-            <span class="n">input_layer</span><span class="p">,</span> <span class="n">use_output_layer</span><span class="p">,</span> <span class="n">normalize_before</span><span class="p">,</span> <span class="n">concat_after</span><span class="p">)</span>
+            <span class="n">input_layer</span><span class="p">,</span> <span class="n">use_output_layer</span><span class="p">,</span> <span class="n">normalize_before</span><span class="p">)</span>
 
         <span class="bp">self</span><span class="o">.</span><span class="n">right_decoder</span> <span class="o">=</span> <span class="n">TransformerDecoder</span><span class="p">(</span>
             <span class="n">vocab_size</span><span class="p">,</span> <span class="n">encoder_output_size</span><span class="p">,</span> <span class="n">attention_heads</span><span class="p">,</span> <span class="n">linear_units</span><span class="p">,</span>
             <span class="n">r_num_blocks</span><span class="p">,</span> <span class="n">dropout_rate</span><span class="p">,</span> <span class="n">positional_dropout_rate</span><span class="p">,</span>
             <span class="n">self_attention_dropout_rate</span><span class="p">,</span> <span class="n">src_attention_dropout_rate</span><span class="p">,</span>
-            <span class="n">input_layer</span><span class="p">,</span> <span class="n">use_output_layer</span><span class="p">,</span> <span class="n">normalize_before</span><span class="p">,</span> <span class="n">concat_after</span><span class="p">)</span>
+            <span class="n">input_layer</span><span class="p">,</span> <span class="n">use_output_layer</span><span class="p">,</span> <span class="n">normalize_before</span><span class="p">)</span>
 
 <div class="viewcode-block" id="BiTransformerDecoder.forward"><a class="viewcode-back" href="../../../python_api/wenet.transformer.decoder.html#wenet.transformer.decoder.BiTransformerDecoder.forward">[docs]</a>    <span class="k">def</span> <span class="nf">forward</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
