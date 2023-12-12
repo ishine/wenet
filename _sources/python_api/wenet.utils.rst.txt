@@ -13,6 +13,7 @@ Submodules
    :maxdepth: 2
 
    wenet.utils.checkpoint
+   wenet.utils.class_utils
    wenet.utils.cmvn
    wenet.utils.common
    wenet.utils.config
@@ -22,7 +23,7 @@ Submodules
    wenet.utils.file_utils
    wenet.utils.init_ali_paraformer
    wenet.utils.init_model
+   wenet.utils.init_tokenizer
    wenet.utils.mask
    wenet.utils.scheduler
-   wenet.utils.tokenize_utils
    wenet.utils.train_utils
