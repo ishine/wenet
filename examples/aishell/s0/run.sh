@@ -71,6 +71,8 @@ deepspeed_config=conf/ds_stage2.json
 deepspeed_save_states="model_only"
 ds_timeout=30
 
+lid_symbol_table_file=
+
 . tools/parse_options.sh || exit 1;
 
 if [ ${stage} -le -1 ] && [ ${stop_stage} -ge -1 ]; then
@@ -177,6 +179,7 @@ if [ ${stage} -le 4 ] && [ ${stop_stage} -ge 4 ]; then
       --num_workers ${num_workers} \
       --prefetch ${prefetch} \
       --pin_memory \
+      ${lid_symbol_table_file:+--lid_symbol_table_file $lid_symbol_table_file} \
       --deepspeed_config ${deepspeed_config} \
       --deepspeed.save_states ${deepspeed_save_states} \
       --timeout $ds_timeout

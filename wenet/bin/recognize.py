@@ -73,6 +73,7 @@ def get_args():
     parser.add_argument('--modes',
                         nargs='+',
                         help="""decoding mode, support the following:
+                             lang
                              attention
                              ctc_greedy_search
                              ctc_prefix_beam_search
@@ -196,6 +197,7 @@ def main():
     test_conf['filter_conf']['max_output_input_ratio'] = 102400
     test_conf['filter_conf']['min_output_input_ratio'] = 0
     test_conf['speed_perturb'] = False
+    test_conf['add_reverb_noise'] = False
     test_conf['spec_aug'] = False
     test_conf['spec_sub'] = False
     test_conf['spec_trim'] = False
@@ -263,8 +265,10 @@ def main():
                 keys = batch["keys"]
                 feats = batch["feats"].to(device)
                 target = batch["target"].to(device)
+                lang_labels = batch['lang_labels'].to(device)
                 feats_lengths = batch["feats_lengths"].to(device)
                 target_lengths = batch["target_lengths"].to(device)
+                lang_label_lengths = batch['lang_label_lengths'].to(device)
                 infos = {"tasks": batch["tasks"], "langs": batch["langs"]}
                 results = model.decode(
                     args.modes,
@@ -284,8 +288,12 @@ def main():
                 for i, key in enumerate(keys):
                     for mode, hyps in results.items():
                         tokens = hyps[i].tokens
-                        line = '{} {}'.format(key,
-                                              tokenizer.detokenize(tokens)[0])
+                        if mode == "lang":
+                            line = '{} {}'.format(key,
+                                                  ''.join(map(str, tokens)) if tokens else '')
+                        else:
+                            line = '{} {}'.format(key,
+                                                  tokenizer.detokenize(tokens)[0])
                         logging.info('{} {}'.format(mode.ljust(max_format_len),
                                                     line))
                         files[mode].write(line + '\n')

@@ -675,6 +675,17 @@ def padding(data):
         speaker = torch.tensor([sample[i]['speaker'] for i in order],
                                dtype=torch.int32)
         batch['speaker'] = speaker
+    # lang labels
+    lang_labels = [
+        torch.tensor([int(c) for c in sample[i]['lang_label']], dtype=torch.int64) for i in order
+    ]
+    lang_label_lengths = torch.tensor([x.size(0) for x in lang_labels],
+                                      dtype=torch.int32)
+    padding_lang_labels = pad_sequence(lang_labels,
+                                       batch_first=True,
+                                       padding_value=-1)
+    batch['lang_labels'] = padding_lang_labels
+    batch['lang_label_lengths'] = lang_label_lengths
     return batch
 
 

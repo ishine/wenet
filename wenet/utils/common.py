@@ -116,7 +116,7 @@ def add_sos_eos(ys_pad: torch.Tensor, sos: int, eos: int,
     Args:
         ys_pad (torch.Tensor): batch of padded target sequences (B, Lmax)
         sos (int): index of <sos>
-        eos (int): index of <eeos>
+        eos (int): index of <eos>
         ignore_id (int): index of padding
 
     Returns:

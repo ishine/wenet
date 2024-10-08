@@ -254,7 +254,11 @@ def attention_beam_search(
     beam_size: int = 10,
     length_penalty: float = 0.0,
     infos: Dict[str, List[str]] = None,
+    lang_recog: bool = False,
 ) -> List[DecodeResult]:
+    if lang_recog:
+        model.sos = 0
+        model.eos = model.sos
     device = encoder_out.device
     batch_size = encoder_out.shape[0]
     # Let's assume B = batch_size and N = beam_size
@@ -289,7 +293,7 @@ def attention_beam_search(
         'self_att_cache': {},
         'cross_att_cache': {},
     }
-    if model.decoder.use_sdpa:
+    if (not lang_recog and model.decoder.use_sdpa) or (lang_recog and model.lid_decoder.use_sdpa):
         encoder_mask = mask_to_bias(encoder_mask, encoder_out.dtype)
     if hasattr(model, 'decode_maxlen'):
         maxlen = model.decode_maxlen
@@ -301,11 +305,15 @@ def attention_beam_search(
         # 2.1 Forward decoder step
         hyps_mask = subsequent_mask(i).unsqueeze(0).repeat(
             running_size, 1, 1).to(device)  # (B*N, i, i)
-        if model.decoder.use_sdpa:
+        if (not lang_recog and model.decoder.use_sdpa) or (lang_recog and model.lid_decoder.use_sdpa):
             hyps_mask = mask_to_bias(hyps_mask, encoder_out.dtype)
         # logp: (B*N, vocab)
-        logp = model.decoder.forward_one_step(encoder_out, encoder_mask, hyps,
-                                              hyps_mask, cache)
+        if not lang_recog:
+            logp = model.decoder.forward_one_step(encoder_out, encoder_mask, hyps,
+                                                  hyps_mask, cache)
+        else:
+            logp = model.lid_decoder.forward_one_step(encoder_out, encoder_mask, hyps,
+                                                  hyps_mask, cache)
         # 2.2 First beam prune: select topk best prob at current time
         top_k_logp, top_k_index = logp.topk(beam_size)  # (B*N, N)
         top_k_logp = mask_finished_scores(top_k_logp, end_flag)

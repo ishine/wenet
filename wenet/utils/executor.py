@@ -104,7 +104,7 @@ class Executor:
         '''
         model.eval()
         info_dict = copy.deepcopy(configs)
-        num_seen_utts, loss_dict, total_acc = 1, {}, []  # avoid division by 0
+        num_seen_utts, loss_dict, total_acc, lid_total_acc = 1, {}, [], []  # avoid division by 0
         with torch.no_grad():
             for batch_idx, batch_dict in enumerate(cv_data_loader):
                 info_dict["tag"] = "CV"
@@ -121,6 +121,8 @@ class Executor:
                 num_seen_utts += num_utts
                 total_acc.append(_dict['th_accuracy'].item(
                 ) if _dict['th_accuracy'] is not None else 0.0)
+                lid_total_acc.append(_dict.get('lid_acc_att', None).item(
+                ) if _dict.get('lid_acc_att', None) is not None else 0.0)
                 for loss_name, loss_value in _dict.items():
                     if loss_value is not None and "loss" in loss_name \
                             and torch.isfinite(loss_value):
@@ -132,4 +134,5 @@ class Executor:
         for loss_name, loss_value in loss_dict.items():
             loss_dict[loss_name] = loss_dict[loss_name] / num_seen_utts
         loss_dict["acc"] = sum(total_acc) / len(total_acc)
+        loss_dict["lid_acc"] = sum(lid_total_acc) / len(lid_total_acc)
         return loss_dict

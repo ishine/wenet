@@ -111,6 +111,12 @@ def init_model(args, configs):
                                                   encoder.output_size(),
                                                   **configs['decoder_conf'])
 
+    lid_decoder_type = configs.get('lid_decoder', 'transformer')
+    lid_vocab_size = configs["lid_output_dim"]
+    lid_decoder = WENET_DECODER_CLASSES[lid_decoder_type](lid_vocab_size,
+                                                  encoder.output_size(),
+                                                  **configs['lid_decoder_conf'])
+
     ctc = WENET_CTC_CLASSES[ctc_type](
         vocab_size,
         encoder.output_size(),
@@ -156,6 +162,8 @@ def init_model(args, configs):
             encoder=encoder,
             decoder=decoder,
             ctc=ctc,
+            lid_vocab_size=lid_vocab_size,
+            lid_decoder=lid_decoder,
             special_tokens=configs.get('tokenizer_conf',
                                        {}).get('special_tokens', None),
             **configs['model_conf'])

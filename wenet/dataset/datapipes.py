@@ -342,6 +342,9 @@ class TarsDataPipe(IterDataPipe):
                                 if postfix == 'txt':
                                     example['txt'] = file_obj.read().decode(
                                         'utf8').strip()
+                                elif postfix == 'lang':
+                                    example['lang_label'] = file_obj.read().decode(
+                                        'utf8').strip()
                                 elif postfix in AUDIO_FORMAT_SETS:
                                     example['wav'] = file_obj.read()
                                 else:

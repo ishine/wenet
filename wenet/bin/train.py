@@ -28,6 +28,7 @@ from torch.distributed.elastic.multiprocessing.errors import record
 from wenet.dataset.lmdb_data import LmdbData
 from wenet.utils.executor import Executor
 from wenet.utils.config import override_config
+from wenet.utils.file_utils import read_symbol_table
 from wenet.utils.init_model import init_model
 from wenet.utils.init_tokenizer import init_tokenizer
 from wenet.utils.train_utils import (
@@ -44,6 +45,7 @@ def get_args():
                         default='torch_ddp',
                         choices=['torch_ddp', 'deepspeed'],
                         help='Engine for paralleled training')
+    parser.add_argument('--lid_symbol_table_file', default='', type=str, required=True)
     parser = add_model_args(parser)
     parser = add_dataset_args(parser)
     parser = add_ddp_args(parser)
@@ -76,10 +78,20 @@ def main():
     # init tokenizer
     tokenizer = init_tokenizer(configs)
 
+    # init lid symbol table
+    if args.lid_symbol_table_file:
+        lid_symbol_table = read_symbol_table(args.lid_symbol_table_file)
+    else:
+        lid_symbol_table = {}
+
     # init reverb and noise data
-    add_reverb_noise_conf = configs['dataset_conf']['add_reverb_noise_conf']
-    reverb_data = LmdbData(add_reverb_noise_conf.get("reverb_data_path"))
-    noise_data = LmdbData(add_reverb_noise_conf.get("noise_data_path"))
+    if configs['dataset_conf']['add_reverb_noise']:
+        add_reverb_noise_conf = configs['dataset_conf']['add_reverb_noise_conf']
+        reverb_data = LmdbData(add_reverb_noise_conf.get("reverb_data_path"))
+        noise_data = LmdbData(add_reverb_noise_conf.get("noise_data_path"))
+    else:
+        reverb_data = None
+        noise_data = None
 
     # Init env for ddp OR deepspeed
     _, _, rank = init_distributed(args)
@@ -90,7 +102,7 @@ def main():
 
     # Do some sanity checks and save config to arsg.model_dir
     configs = check_modify_and_save_config(args, configs,
-                                           tokenizer.symbol_table)
+                                           tokenizer.symbol_table, lid_symbol_table)
 
     # Init asr model from configs
     model, configs = init_model(args, configs)
@@ -162,8 +174,8 @@ def main():
         loss_dict = executor.cv(model, cv_data_loader, configs)
 
         lr = optimizer.param_groups[0]['lr']
-        logging.info('Epoch {} CV info lr {} cv_loss {} rank {} acc {}'.format(
-            epoch, lr, loss_dict["loss"], rank, loss_dict["acc"]))
+        logging.info('Epoch {} CV info lr {} cv_loss {} rank {} acc {} lid_acc {}'.format(
+            epoch, lr, loss_dict["loss"], rank, loss_dict["acc"], loss_dict.get("lid_acc", None)))
         info_dict = {
             'epoch': epoch,
             'lr': lr,

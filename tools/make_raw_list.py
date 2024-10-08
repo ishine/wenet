@@ -21,6 +21,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='')
     parser.add_argument('--segments', default=None, help='segments file')
     parser.add_argument('wav_file', help='wav file')
+    parser.add_argument('lang_file', help='lang file')
     parser.add_argument('text_file', help='text file')
     parser.add_argument('output_file', help='output list file')
     args = parser.parse_args()
@@ -31,6 +32,13 @@ if __name__ == '__main__':
             arr = line.strip().split()
             assert len(arr) == 2
             wav_table[arr[0]] = arr[1]
+
+    lang_table = {}
+    with open(args.lang_file, 'r', encoding='utf8') as fin:
+        for line in fin:
+            arr = line.strip().split()
+            assert len(arr) == 2
+            lang_table[arr[0]] = arr[1]
 
     if args.segments is not None:
         segments_table = {}
@@ -49,7 +57,8 @@ if __name__ == '__main__':
             if args.segments is None:
                 assert key in wav_table
                 wav = wav_table[key]
-                line = dict(key=key, wav=wav, txt=txt)
+                lang_label = lang_table[key]
+                line = dict(key=key, wav=wav, txt=txt, lang_label=lang_label)
             else:
                 assert key in segments_table
                 wav_key, start, end = segments_table[key]

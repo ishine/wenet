@@ -156,7 +156,7 @@ def init_distributed(args):
     return world_size, local_rank, rank
 
 
-def check_modify_and_save_config(args, configs, symbol_table):
+def check_modify_and_save_config(args, configs, symbol_table, lid_symbol_table):
     if args.train_engine == "torch_ddp":
         if args.use_amp:
             configs["dtype"] = "fp16"
@@ -216,6 +216,7 @@ def check_modify_and_save_config(args, configs, symbol_table):
 
     configs['input_dim'] = input_dim
     configs['output_dim'] = configs['vocab_size']
+    configs['lid_output_dim'] = len(lid_symbol_table)
 
     configs['train_engine'] = args.train_engine
     configs['use_amp'] = args.use_amp

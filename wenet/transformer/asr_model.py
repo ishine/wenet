@@ -41,6 +41,9 @@ class ASRModel(torch.nn.Module):
         encoder: BaseEncoder,
         decoder: TransformerDecoder,
         ctc: CTC,
+        lid_vocab_size: int,
+        lid_decoder: TransformerDecoder,
+        lid_weight: float = 0.0,
         ctc_weight: float = 0.5,
         ignore_id: int = IGNORE_ID,
         reverse_weight: float = 0.0,
@@ -74,6 +77,16 @@ class ASRModel(torch.nn.Module):
             normalize_length=length_normalized_loss,
         )
 
+        self.lid_vocab_size = lid_vocab_size
+        self.lid_decoder = lid_decoder
+        self.lid_weight = lid_weight
+        self.lid_criterion_att = LabelSmoothingLoss(
+            size=lid_vocab_size,
+            padding_idx=ignore_id,
+            smoothing=lsm_weight,
+            normalize_length=length_normalized_loss,
+        )
+
     @torch.jit.ignore(drop=True)
     def forward(
         self,
@@ -85,6 +98,8 @@ class ASRModel(torch.nn.Module):
         speech_lengths = batch['feats_lengths'].to(device)
         text = batch['target'].to(device)
         text_lengths = batch['target_lengths'].to(device)
+        lang_labels = batch['lang_labels'].to(device)
+        lang_label_lengths = batch['lang_label_lengths'].to(device)
 
         assert text_lengths.dim() == 1, text_lengths.shape
         # Check that batch_size is unified
@@ -119,19 +134,39 @@ class ASRModel(torch.nn.Module):
             loss_att = None
             acc_att = None
 
-        if loss_ctc is None:
-            loss = loss_att
-        elif loss_att is None:
-            loss = loss_ctc
+        # 2c. LID-decoder branch
+        if self.lid_weight != 0.0:
+            lid_loss_att, lid_acc_att = self._calc_lid_att_loss(
+                encoder_out, encoder_mask, lang_labels, lang_label_lengths, {
+                    "langs": batch["langs"],
+                    "tasks": batch["tasks"]
+                })
         else:
-            loss = self.ctc_weight * loss_ctc + (1 -
-                                                 self.ctc_weight) * loss_att
+            lid_loss_att = None
+            lid_acc_att = None
+        loss = loss_att * (1 - self.ctc_weight) + loss_ctc * self.ctc_weight + lid_loss_att * self.lid_weight
         return {
             "loss": loss,
             "loss_att": loss_att,
             "loss_ctc": loss_ctc,
             "th_accuracy": acc_att,
+            "lid_loss_att": lid_loss_att,
+            "lid_acc_att": lid_acc_att,
         }
+
+        # if loss_ctc is None:
+        #     loss = loss_att
+        # elif loss_att is None:
+        #     loss = loss_ctc
+        # else:
+        #     loss = self.ctc_weight * loss_ctc + (1 -
+        #                                          self.ctc_weight) * loss_att
+        # return {
+        #     "loss": loss,
+        #     "loss_att": loss_att,
+        #     "loss_ctc": loss_ctc,
+        #     "th_accuracy": acc_att,
+        # }
 
     @torch.jit.ignore(drop=True)
     def _forward_ctc(
@@ -206,6 +241,30 @@ class ASRModel(torch.nn.Module):
         )
         return loss_att, acc_att
 
+    def _calc_lid_att_loss(
+        self,
+        encoder_out: torch.Tensor,
+        encoder_mask: torch.Tensor,
+        ys_pad: torch.Tensor,
+        ys_pad_lens: torch.Tensor,
+        infos: Dict[str, List[str]] = None,
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
+        sos = eos = 0
+        ys_in_pad, ys_out_pad = add_sos_eos(ys_pad, sos, eos,
+                                            self.ignore_id)
+        ys_in_lens = ys_pad_lens + 1
+        # 1. Forward decoder
+        decoder_out, _, _ = self.lid_decoder(encoder_out, encoder_mask,
+                                                     ys_in_pad, ys_in_lens)
+        # 2. Compute attention loss
+        loss_att = self.lid_criterion_att(decoder_out, ys_out_pad)
+        acc_att = th_accuracy(
+            decoder_out.view(-1, self.lid_vocab_size),
+            ys_out_pad,
+            ignore_label=self.ignore_id,
+        )
+        return loss_att, acc_att
+
     def _forward_encoder(
         self,
         speech: torch.Tensor,
@@ -261,6 +320,7 @@ class ASRModel(torch.nn.Module):
         blank_penalty: float = 0.0,
         length_penalty: float = 0.0,
         infos: Dict[str, List[str]] = None,
+        lang_recog: bool = False,
     ) -> Dict[str, List[DecodeResult]]:
         """ Decode input speech
 
@@ -295,6 +355,10 @@ class ASRModel(torch.nn.Module):
         encoder_lens = encoder_mask.squeeze(1).sum(1)
         ctc_probs = self.ctc_logprobs(encoder_out, blank_penalty, blank_id)
         results = {}
+        if 'lang' in methods:
+            results['lang'] = attention_beam_search(
+                self, encoder_out, encoder_mask, beam_size, length_penalty,
+                infos, lang_recog=True)
         if 'attention' in methods:
             results['attention'] = attention_beam_search(
                 self, encoder_out, encoder_mask, beam_size, length_penalty,
