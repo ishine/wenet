@@ -25,19 +25,21 @@ HOST_NODE_ADDR="localhost:0"
 num_nodes=1
 job_id=2024
 
-# The aishell dataset location, please change this to your own path
+# The dataset location, please change this to your own path
 # make sure of using absolute path. DO-NOT-USE relatvie path!
-# data=/root/data/KeSpeech/KeSpeech/Subdialects/Beijing
-# data=/root/data/KeSpeech/KeSpeech/Subdialects/Jiang-Huai
-# data=/root/data/KeSpeech/KeSpeech/Subdialects/Jiao-Liao
-# data=/root/data/KeSpeech/KeSpeech/Subdialects/Ji-Lu
-# data=/root/data/KeSpeech/KeSpeech/Subdialects/Lan-Yin
-# data=/root/data/KeSpeech/KeSpeech/Subdialects/Northeastern
-# data=/root/data/KeSpeech/KeSpeech/Subdialects/Southwestern
-data=/root/data/KeSpeech/KeSpeech/Subdialects/Zhongyuan
+data=/root/data/KeSpeech/KeSpeech
+subdialect=Beijing
+# subdialect=Ji-Lu
+# subdialect=Jiang-Huai
+# subdialect=Jiao-Liao
+# subdialect=Lan-Yin
+# subdialect=Mandarin
+# subdialect=Northeastern
+# subdialect=Southwestern
+# subdialect=Zhongyuan
 
 nj=16
-dict=data/dict/lang_char.txt
+dict=data/${subdialect}/dict/lang_char.txt
 
 # data_type can be `raw` or `shard`. Typically, raw is used for small dataset,
 # `shard` is used for large dataset which is over 1k hours, and `shard` is
@@ -45,7 +47,9 @@ dict=data/dict/lang_char.txt
 data_type=raw
 num_utts_per_shard=1000
 
-train_set=train
+train_set=train_phase1
+test_set=test_phase1
+dev_set=dev_phase1
 # Optional train_config
 # 1. conf/train_transformer.yaml: Standard transformer
 # 2. conf/train_conformer.yaml: Standard conformer
@@ -78,17 +82,17 @@ deepspeed_save_states="model_only"
 
 if [ ${stage} -le 1 ] && [ ${stop_stage} -ge 1 ]; then
     # remove the space between the text labels for Mandarin dataset
-    for x in train dev test; do
-        cp data/${x}/text data/${x}/text.org
-        paste -d " " <(cut -f 1 -d" " data/${x}/text.org) \
-            <(cut -f 2- -d" " data/${x}/text.org | tr -d " ") \
-            >data/${x}/text
-        rm data/${x}/text.org
+    for x in train_phase1 dev_phase1 test_phase1; do
+        cp data/${subdialect}/${x}/text data/${subdialect}/${x}/text.org
+        paste -d " " <(cut -f 1 -d" " data/${subdialect}/${x}/text.org) \
+            <(cut -f 2- -d" " data/${subdialect}/${x}/text.org | tr -d " ") \
+            >data/${subdialect}/${x}/text
+        rm data/${subdialect}/${x}/text.org
     done
 
     tools/compute_cmvn_stats.py --num_workers 16 --train_config $train_config \
-        --in_scp data/${train_set}/wav.scp \
-        --out_cmvn data/$train_set/global_cmvn
+        --in_scp data/${subdialect}/${train_set}/wav.scp \
+        --out_cmvn data/${subdialect}/${train_set}/global_cmvn
 fi
 
 if [ ${stage} -le 2 ] && [ ${stop_stage} -ge 2 ]; then
@@ -97,21 +101,21 @@ if [ ${stage} -le 2 ] && [ ${stop_stage} -ge 2 ]; then
     echo "<blank> 0" >${dict} # 0 is for "blank" in CTC
     echo "<unk> 1" >>${dict}  # <unk> must be 1
     echo "<sos/eos> 2" >>$dict
-    tools/text2token.py -s 1 -n 1 data/train/text | cut -f 2- -d" " |
+    tools/text2token.py -s 1 -n 1 data/${subdialect}/${train_set}/text | cut -f 2- -d" " |
         tr " " "\n" | sort | uniq | grep -a -v -e '^\s*$' |
         awk '{print $0 " " NR+2}' >>${dict}
 fi
 
 if [ ${stage} -le 3 ] && [ ${stop_stage} -ge 3 ]; then
     echo "Prepare data, prepare required format"
-    for x in dev test ${train_set}; do
+    for x in ${dev_set} ${test_set} ${train_set}; do
         if [ $data_type == "shard" ]; then
             tools/make_shard_list.py --num_utts_per_shard $num_utts_per_shard \
-                --num_threads 16 data/$x/wav.scp data/$x/text \
-                $(realpath data/$x/shards) data/$x/data.list
+                --num_threads 16 data/${subdialect}/$x/wav.scp data/${subdialect}/$x/text \
+                $(realpath data/${subdialect}/$x/shards) data/${subdialect}/$x/data.list
         else
-            tools/make_raw_list.py data/$x/wav.scp data/$x/text \
-                data/$x/data.list
+            tools/make_raw_list.py data/${subdialect}/$x/wav.scp data/${subdialect}/$x/text \
+                data/${subdialect}/$x/data.list
         fi
     done
 fi
@@ -156,8 +160,8 @@ if [ ${stage} -le 4 ] && [ ${stop_stage} -ge 4 ]; then
         --train_engine ${train_engine} \
         --config $train_config \
         --data_type $data_type \
-        --train_data data/$train_set/data.list \
-        --cv_data data/dev/data.list \
+        --train_data data/${subdialect}/${train_set}/data.list \
+        --cv_data data/${subdialect}/${dev_set}/data.list \
         ${checkpoint:+--checkpoint $checkpoint} \
         --model_dir $dir \
         --tensorboard_dir ${tensorboard_dir} \
@@ -190,7 +194,7 @@ if [ ${stage} -le 5 ] && [ ${stop_stage} -ge 5 ]; then
         --modes $decode_modes \
         --config $dir/train.yaml \
         --data_type $data_type \
-        --test_data data/test/data.list \
+        --test_data data/${test_set}/data.list \
         --checkpoint $decode_checkpoint \
         --beam_size 10 \
         --batch_size 32 \
@@ -201,7 +205,7 @@ if [ ${stage} -le 5 ] && [ ${stop_stage} -ge 5 ]; then
         ${decoding_chunk_size:+--decoding_chunk_size $decoding_chunk_size}
     for mode in ${decode_modes}; do
         python tools/compute-wer.py --char=1 --v=1 \
-            data/test/text $dir/$mode/text >$dir/$mode/wer
+            data/${test_set}/text $dir/$mode/text >$dir/$mode/wer
     done
 fi
 
@@ -212,95 +216,4 @@ if [ ${stage} -le 6 ] && [ ${stop_stage} -ge 6 ]; then
         --checkpoint $dir/avg_${average_num}.pt \
         --output_file $dir/final.zip \
         --output_quant_file $dir/final_quant.zip
-fi
-
-# Optionally, you can add LM and test it with runtime.
-if [ ${stage} -le 7 ] && [ ${stop_stage} -ge 7 ]; then
-    # 7.1 Prepare dict
-    unit_file=$dict
-    mkdir -p data/local/dict
-    cp $unit_file data/local/dict/units.txt
-    tools/fst/prepare_dict.py $unit_file ${data}/resource_aishell/lexicon.txt \
-        data/local/dict/lexicon.txt
-    # 7.2 Train lm
-    lm=data/local/lm
-    mkdir -p $lm
-    tools/filter_scp.pl data/train/text \
-        $data/data_aishell/transcript/aishell_transcript_v0.8.txt >$lm/text
-    local/aishell_train_lms.sh
-    # 7.3 Build decoding TLG
-    tools/fst/compile_lexicon_token_fst.sh \
-        data/local/dict data/local/tmp data/local/lang
-    tools/fst/make_tlg.sh data/local/lm data/local/lang data/lang_test || exit 1
-    # 7.4 Decoding with runtime
-    chunk_size=-1
-    ./tools/decode.sh --nj 16 \
-        --beam 15.0 --lattice_beam 7.5 --max_active 7000 \
-        --blank_skip_thresh 0.98 --ctc_weight 0.5 --rescoring_weight 1.0 \
-        --chunk_size $chunk_size \
-        --fst_path data/lang_test/TLG.fst \
-        --dict_path data/lang_test/words.txt \
-        data/test/wav.scp data/test/text $dir/final.zip \
-        data/lang_test/units.txt $dir/lm_with_runtime
-    # Please see $dir/lm_with_runtime for wer
-fi
-
-# Optionally, you can decode with k2 hlg
-if [ ${stage} -le 8 ] && [ ${stop_stage} -ge 8 ]; then
-    if [ ! -f data/local/lm/lm.arpa ]; then
-        echo "Please run prepare dict and train lm in Stage 7" || exit 1
-    fi
-
-    # 8.1 Build decoding HLG
-    required="data/local/hlg/HLG.pt data/local/hlg/words.txt"
-    for f in $required; do
-        if [ ! -f $f ]; then
-            tools/k2/make_hlg.sh data/local/dict/ data/local/lm/ data/local/hlg
-            break
-        fi
-    done
-
-    # 8.2 Decode using HLG
-    decoding_chunk_size=
-    lm_scale=0.7
-    decoder_scale=0.1
-    r_decoder_scale=0.7
-    decode_modes="hlg_onebest hlg_rescore"
-    python wenet/bin/recognize.py --gpu 0 \
-        --modes $decode_modes \
-        --config $dir/train.yaml \
-        --data_type $data_type \
-        --test_data data/test/data.list \
-        --checkpoint $decode_checkpoint \
-        --beam_size 10 \
-        --batch_size 16 \
-        --blank_penalty 0.0 \
-        --dict $dict \
-        --word data/local/hlg/words.txt \
-        --hlg data/local/hlg/HLG.pt \
-        --lm_scale $lm_scale \
-        --decoder_scale $decoder_scale \
-        --r_decoder_scale $r_decoder_scale \
-        --result_dir $dir \
-        ${decoding_chunk_size:+--decoding_chunk_size $decoding_chunk_size}
-    for mode in ${decode_modes}; do
-        python tools/compute-wer.py --char=1 --v=1 \
-            data/test/text $dir/$mode/text >$dir/$mode/wer
-    done
-fi
-
-# Optionally, you can train with LF-MMI using k2
-# Based on 20210601_u2++_conformer_exp/final.pt, we train 50 epocs with 1e-5 lr
-# and average 10 best models, achieve 4.11 cer with hlg decoding
-# Actually, you can achieve even lower cer by tuning lm_scale/decoder_scale/r_decoder_scale
-if [ ${stage} -le 9 ] && [ ${stop_stage} -ge 9 ]; then
-    # 9.1 Build token level bigram fst for LF-MMI training
-    tools/k2/prepare_mmi.sh data/train/ data/dev data/local/lfmmi
-
-    # 9.2 Run LF-MMI training from stage 4, modify below args in train.yaml
-    # model: k2_model
-    # model_conf:
-    #   lfmmi_dir data/local/lfmmi
-
-    # 9.3 Run HLG decode from stage 8.2
 fi

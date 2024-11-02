@@ -70,9 +70,9 @@ def split_subdialect():
                 with open(text_path, "a+") as f_target_text, open(
                     wav_scp_path, "a+"
                 ) as f_target_wav_scp:
-                    f_target_text.write(f"{audio_id}\t{text}\n")
+                    f_target_text.write(f"{audio_id} {text}\n")
                     f_target_wav_scp.write(
-                        f"{audio_id}\t{os.path.join(KESPEECH_ROOT,audio_path)}\n"
+                        f"{audio_id} {os.path.join(KESPEECH_ROOT,audio_path)}\n"
                     )
         logging.info(f"Processing {sub_dataset_name} is completed.")
 
