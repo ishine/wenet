@@ -194,7 +194,7 @@ if [ ${stage} -le 5 ] && [ ${stop_stage} -ge 5 ]; then
         --modes $decode_modes \
         --config $dir/train.yaml \
         --data_type $data_type \
-        --test_data data/${test_set}/data.list \
+        --test_data data/${subdialect}/${test_set}/data.list \
         --checkpoint $decode_checkpoint \
         --beam_size 10 \
         --batch_size 32 \
@@ -205,7 +205,7 @@ if [ ${stage} -le 5 ] && [ ${stop_stage} -ge 5 ]; then
         ${decoding_chunk_size:+--decoding_chunk_size $decoding_chunk_size}
     for mode in ${decode_modes}; do
         python tools/compute-wer.py --char=1 --v=1 \
-            data/${test_set}/text $dir/$mode/text >$dir/$mode/wer
+            data/${subdialect}/${test_set}/text $dir/$mode/text >$dir/$mode/wer
     done
 fi
 
