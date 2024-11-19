@@ -30,7 +30,7 @@ decoder_conf:
 
 tokenizer: char
 tokenizer_conf:
-  symbol_table_path: 'data/dict/lang_char.txt'
+  symbol_table_path: 'data/Beijing/dict/lang_char.txt'
   split_with_space: false
   bpe_path: null
   non_lang_syms_path: null
@@ -48,7 +48,7 @@ ctc_conf:
 
 cmvn: global_cmvn
 cmvn_conf:
-  cmvn_file: 'data/train/global_cmvn'
+  cmvn_file: 'data/Beijing/train_phase1/global_cmvn'
   is_json_cmvn: true
 
 # hybrid CTC/attention
