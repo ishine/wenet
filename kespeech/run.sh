@@ -60,8 +60,8 @@ dev_set=dev_phase1
 # 7. conf/train_u2++_conformer.yaml: U2++ lite conformer, must load a well
 #    trained model, and freeze encoder module, otherwise there will be a
 #    autograd error
-train_config=conf/train_conformer.yaml
-dir=exp/conformer
+train_config=conf/train_mffded.yaml
+dir=exp/mffded
 tensorboard_dir=tensorboard
 checkpoint=
 num_workers=8
