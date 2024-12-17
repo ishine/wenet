@@ -27,8 +27,8 @@ job_id=2024
 
 # The dataset location, please change this to your own path
 # make sure of using absolute path. DO-NOT-USE relatvie path!
-data=/root/data/KeSpeech/KeSpeech
-subdialect=Beijing
+data=/root/DSR/KeSpeech/KeSpeech
+# subdialect=Beijing
 # subdialect=Ji-Lu
 # subdialect=Jiang-Huai
 # subdialect=Jiao-Liao
@@ -37,6 +37,7 @@ subdialect=Beijing
 # subdialect=Northeastern
 # subdialect=Southwestern
 # subdialect=Zhongyuan
+subdialect=Subdialects
 
 nj=16
 dict=data/${subdialect}/dict/lang_char.txt
@@ -51,17 +52,10 @@ train_set=train_phase1
 test_set=test_phase1
 dev_set=dev_phase1
 # Optional train_config
-# 1. conf/train_transformer.yaml: Standard transformer
-# 2. conf/train_conformer.yaml: Standard conformer
-# 3. conf/train_unified_conformer.yaml: Unified dynamic chunk causal conformer
-# 4. conf/train_unified_transformer.yaml: Unified dynamic chunk transformer
-# 5. conf/train_u2++_conformer.yaml: U2++ conformer
-# 6. conf/train_u2++_transformer.yaml: U2++ transformer
-# 7. conf/train_u2++_conformer.yaml: U2++ lite conformer, must load a well
-#    trained model, and freeze encoder module, otherwise there will be a
-#    autograd error
-train_config=conf/train_mffded.yaml
-dir=exp/mffded
+# 1. conf/train_mffded.yaml
+# 2. conf/train_dimnet.yaml
+train_config=conf/train_dimnet.yaml
+dir=exp/dimnet
 tensorboard_dir=tensorboard
 checkpoint=
 num_workers=8
@@ -114,8 +108,10 @@ if [ ${stage} -le 3 ] && [ ${stop_stage} -ge 3 ]; then
                 --num_threads 16 data/${subdialect}/$x/wav.scp data/${subdialect}/$x/text \
                 $(realpath data/${subdialect}/$x/shards) data/${subdialect}/$x/data.list
         else
-            tools/make_raw_list.py data/${subdialect}/$x/wav.scp data/${subdialect}/$x/text \
-                data/${subdialect}/$x/data.list
+            # tools/make_raw_list.py data/${subdialect}/$x/wav.scp data/${subdialect}/$x/text \
+            #     data/${subdialect}/$x/data.list
+            local/make_raw_list.py data/${subdialect}/$x/wav.scp data/${subdialect}/$x/text \
+                data/${subdialect}/$x/utt2subdialect data/${subdialect}/$x/data.list
         fi
     done
 fi

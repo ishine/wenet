@@ -138,16 +138,17 @@ class DIMNet(ASRModel):
                 loss = loss_att
             else:
                 loss = (
-                    self.lasas_weight * loss_lasas + (1 - self.lasas_weight) * loss_att
+                    self.lasas_weight * loss_lasas
+                    + (1.0 - self.lasas_weight) * loss_att
                 )
         else:
             if loss_lasas is None:
-                loss = self.ctc_weight * loss_ctc + (1 - self.ctc_weight) * loss_att
+                loss = self.ctc_weight * loss_ctc + (1.0 - self.ctc_weight) * loss_att
             else:
                 loss = (
                     self.ctc_weight * loss_ctc
                     + self.lasas_weight * loss_lasas
-                    + (1 - (self.ctc_weight + self.lasas_weight) * loss_att)
+                    + (1.0 - self.ctc_weight - self.lasas_weight) * loss_att
                 )
         return {
             "loss": loss,
