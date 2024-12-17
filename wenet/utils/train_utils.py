@@ -324,7 +324,11 @@ def check_modify_and_save_config(args, configs, symbol_table):
         configs['lora_conf']['lora_alpha'] = args.lora_alpha
         configs['lora_conf']['lora_dropout'] = args.lora_dropout
 
-    if configs["model"] == 'asr_model' or configs["model"] == 'mffded':
+    if (
+        configs["model"] == "asr_model"
+        or configs["model"] == "mffded"
+        or configs["model"] == "dimnet"
+    ):
         if 'input_dim' not in configs:
             if 'fbank_conf' in configs['dataset_conf']:
                 input_dim = configs['dataset_conf']['fbank_conf'][

@@ -64,6 +64,7 @@ def Dataset(data_type,
                                              shuffle_size=list_shuffle_size,
                                              cycle=cycle)
     dataset = dataset.map_ignore_error(processor.decode_wav)
+    dataset = dataset.map(processor.make_subdialect_one_hot)
 
     singal_channel_conf = conf.get('singal_channel_conf', {})
     dataset = dataset.map(
