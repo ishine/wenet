@@ -247,6 +247,9 @@ class DIMNet(ASRModel):
             att_encoder_in, encoder_out_lens
         )
 
+        # 4b. Attention Decoder
+        att_encoder_out = torch.concat((att_encoder_out, bimodal_feats), dim=2)
+
         results = {}
         if "attention" in methods:
             results["attention"] = attention_beam_search(
@@ -274,12 +277,10 @@ class DIMNet(ASRModel):
                 ctc_prefix_result = ctc_prefix_beam_search(
                     ctc_probs, encoder_out_lens, beam_size, context_graph, blank_id
                 )
-            if self.apply_non_blank_embedding:
-                encoder_out, _ = self.filter_blank_embedding(ctc_probs, encoder_out)
             results["attention_rescoring"] = attention_rescoring(
                 self,
                 ctc_prefix_result,
-                encoder_out,
+                att_encoder_out,
                 encoder_out_lens,
                 ctc_weight,
                 reverse_weight,
