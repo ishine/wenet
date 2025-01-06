@@ -204,5 +204,7 @@ class LASASARModel(torch.nn.Module):
 
         # Linears
         bimodal_feats = self.linear(context_sensitive_representation)  # (B, T, C)
+        if self.normalize:
+            bimodal_feats = self.norm(bimodal_feats)
 
         return bimodal_feats
