@@ -21,6 +21,7 @@ from langid.langid import LanguageIdentifier, model
 import logging
 import librosa
 import random
+import wave
 
 import torch
 from torch.nn.utils.rnn import pad_sequence
@@ -176,6 +177,23 @@ def decode_wav(sample):
     del sample['wav']
     sample['wav'] = waveform  # overwrite wav
     sample['sample_rate'] = sample_rate
+    return sample
+
+
+def compute_speaking_speed(sample):
+    assert "wav" in sample
+    assert "txt" in sample
+    wav_file = sample["wav"]
+    txt = sample["txt"]
+
+    with wave.open(wav_file, "r") as wav:
+        n_frames = wav.getnframes()
+    text_length = len(txt)
+
+    # calculate speaking speed in char per frame
+    speaking_speed = n_frames / text_length if text_length > 0 else 0
+    sample["speaking_speed"] = speaking_speed
+
     return sample
 
 

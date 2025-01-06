@@ -2,6 +2,8 @@ from typing import Tuple
 
 import torch
 
+from wenet.utils.class_utils import WENET_NORM_CLASSES
+
 
 class LASASBlock(torch.nn.Module):
     def __init__(
@@ -87,6 +89,9 @@ class LASASARModel(torch.nn.Module):
         hidden_dim: int,
         num_heads: int,
         num_classes: int,
+        normalize: bool = True,
+        layer_norm_type: str = "layer_norm",
+        norm_eps: float = 1e-5,
     ):
         """
         LASAS Accent Recognition Model
@@ -116,6 +121,9 @@ class LASASARModel(torch.nn.Module):
             torch.nn.ReLU(),
             torch.nn.Linear(hidden_dim // 2, hidden_dim),
         )
+
+        self.normalize = normalize
+        self.norm = WENET_NORM_CLASSES[layer_norm_type](hidden_dim, eps=norm_eps)
 
         # Classifier
         self.classifier = torch.nn.Sequential(
@@ -161,6 +169,8 @@ class LASASARModel(torch.nn.Module):
 
         # Linears
         bimodal_feats = self.linear(context_sensitive_representation)  # (B, T, C)
+        if self.normalize:
+            bimodal_feats = self.norm(bimodal_feats)
 
         # Global pooling (mean pooling over time)
         pooled_representation = context_sensitive_representation.mean(dim=1)  # (B, C)
