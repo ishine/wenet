@@ -94,7 +94,7 @@ def parse_url(elem):
         raise UrlOpenError(err_msg) from ex
 
 
-def make_subdialect_one_hot(sample):
+def subdialect_to_index(sample):
     subdialect_dict = {
         "Mandarin": 0,  # 普通话
         "Beijing": 1,  # 北京官话
@@ -108,11 +108,7 @@ def make_subdialect_one_hot(sample):
     }
 
     if "subdialect" in sample:
-        num_dialects = len(subdialect_dict)
-        subdialect = sample["subdialect"]
-        one_hot = [0] * num_dialects
-        one_hot[subdialect_dict[subdialect]] = 1.0
-        sample["subdialect"] = torch.tensor(one_hot)
+        sample["subdialect"] = subdialect_dict[sample["subdialect"]]
 
     return sample
 
@@ -619,7 +615,9 @@ def padding(data):
                                dtype=torch.int32)
         batch['speaker'] = speaker
     if 'subdialect' in sample[0]:
-        subdialects = torch.stack([sample[i]['subdialect'] for i in order])
+        subdialects = torch.tensor(
+            [sample[i]["subdialect"] for i in order], dtype=torch.int64
+        )
         batch['subdialects'] = subdialects
     return batch
 

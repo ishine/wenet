@@ -133,7 +133,20 @@ class LASASARModel(torch.nn.Module):
         )
 
         # Loss function
-        self.loss_fn = torch.nn.CrossEntropyLoss()
+        weights = torch.Tensor(
+            [
+                2.943297376050389e-06,  # 0 Mandarin
+                0.00044603033006244426,  # 1 Beijing
+                3.618992472495657e-05,  # 2 Jiang-Huai
+                4.929508035098097e-05,  # 3 Jiao-Liao
+                2.9449876310519495e-05,  # 4 Ji_Lu
+                4.8619214313496694e-05,  # 5 Lan-Yin
+                0.00020622808826562179,  # 6 Northeastern
+                2.1910604732690622e-05,  # 7 Southwestern
+                2.0531351373547405e-05,  # 8 Zhongyuan
+            ]
+        )
+        self.loss_fn = torch.nn.CrossEntropyLoss(weight=weights)
 
     def forward(
         self,
@@ -147,7 +160,7 @@ class LASASARModel(torch.nn.Module):
         Args:
             acoustic_embeddings (torch.Tensor): Acoustic embeddings of shape (B, T, D).
             text_vectors (torch.Tensor): Aligned text vectors of shape (B, T, vocab).
-            labels (torch.Tensor, optional): Ground truth labels of shape (B, num_classes).
+            labels (torch.Tensor, optional): Ground truth labels of shape (B).
 
         Returns:
             bimodal_feats (torch.Tensor): The bimodal features of dialect and text (B, T, C).

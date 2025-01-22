@@ -120,13 +120,13 @@ dataset_conf:
         batch_size: 32
 
 grad_clip: 5
-accum_grad: 1
+accum_grad: 4
 max_epoch: 200
 log_interval: 100
 
 optim: adam
 optim_conf:
-    lr: 0.0001
+    lr: 0.00005
 scheduler: warmuplr     # pytorch v1.1.0+ required
 scheduler_conf:
-    warmup_steps: 150000
+    warmup_steps: 50000
