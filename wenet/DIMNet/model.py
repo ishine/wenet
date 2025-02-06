@@ -1,6 +1,7 @@
 from typing import List, Dict, Tuple, Optional
 
 import torch
+import torch.nn.functional as F
 
 from wenet.transformer.asr_model import ASRModel
 from wenet.transformer.ctc import CTC
@@ -16,7 +17,26 @@ from wenet.transformer.search import (
     attention_rescoring,
     DecodeResult,
 )
+from wenet.utils.mask import make_pad_mask
+from wenet.utils.ctc_utils import remove_duplicates_and_blank
 from wenet.utils.context_graph import ContextGraph
+
+
+def greedy_search(
+    ctc_probs: torch.Tensor, ctc_lens: torch.Tensor, blank_id: int = 0
+) -> List[DecodeResult]:
+    batch_size = ctc_probs.shape[0]
+    maxlen = ctc_probs.size(1)
+    topk_prob, topk_index = ctc_probs.topk(1, dim=2)  # (B, maxlen, 1)
+    topk_index = topk_index.view(batch_size, maxlen)  # (B, maxlen)
+    mask = make_pad_mask(ctc_lens, maxlen)  # (B, maxlen)
+    topk_index = topk_index.masked_fill_(mask, blank_id)  # (B, maxlen)
+    hyps = [hyp.tolist() for hyp in topk_index]
+    scores = topk_prob.max(1)
+    results = []
+    for hyp in hyps:
+        results.append(hyp)
+    return torch.tensor(results)
 
 
 class DIMNet(ASRModel):
@@ -104,11 +124,14 @@ class DIMNet(ASRModel):
             fusion_layer_feats = torch.concat(layer_feats, dim=-1)
             ctc_probs_detached = ctc_probs.detach()
             # 原论文需要GreedySearch并Regular
-            # temp_res = ctc_greedy_search(
-            #     ctc_probs_detached, ctc_encoder_out_lens, blank_id=0
-            # )
+            greedy_decoded = greedy_search(
+                ctc_probs_detached, ctc_encoder_out_lens, blank_id=0
+            )
+            greedy_decoded = F.one_hot(
+                greedy_decoded, num_classes=ctc_probs_detached.shape[-1]
+            ).float().to(device)
             bimodal_feats, loss_lasas = self.lasas_ar(
-                fusion_layer_feats, ctc_probs_detached, subdialect_lables
+                fusion_layer_feats, greedy_decoded, subdialect_lables
             )
         else:
             bimodal_feats, loss_lasas = None, None
