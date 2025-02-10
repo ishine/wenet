@@ -22,16 +22,6 @@ from wenet.utils.ctc_utils import remove_duplicates_and_blank
 from wenet.utils.context_graph import ContextGraph
 
 
-def greedy_search(
-    ctc_probs: torch.Tensor, ctc_lens: torch.Tensor, blank_id: int = 0
-) -> torch.Tensor:
-    batch_size, maxlen, _ = ctc_probs.shape
-    topk_index = ctc_probs.argmax(dim=2)  # (B, maxlen)
-    mask = make_pad_mask(ctc_lens, maxlen).to(ctc_probs.device)  # (B, maxlen)
-    topk_index.masked_fill_(mask, blank_id)  # (B, maxlen)
-    return topk_index
-
-
 class DIMNet(ASRModel):
     def __init__(
         self,
@@ -117,12 +107,12 @@ class DIMNet(ASRModel):
             fusion_layer_feats = torch.concat(layer_feats, dim=-1)
             ctc_probs_detached = ctc_probs.detach()
             # 原论文需要GreedySearch并Regular
-            greedy_decoded = greedy_search(
+            greedy_decoded = self.greedy_search(
                 ctc_probs_detached, ctc_encoder_out_lens, blank_id=0
             )
             greedy_decoded = F.one_hot(
                 greedy_decoded, num_classes=ctc_probs_detached.shape[-1]
-            ).float().to(device)
+            ).float()
             bimodal_feats, loss_lasas = self.lasas_ar(
                 fusion_layer_feats, greedy_decoded, subdialect_lables
             )
@@ -252,10 +242,15 @@ class DIMNet(ASRModel):
 
         # 2b. CTC Decoder
         ctc_probs = self.ctc_logprobs(ctc_encoder_out, blank_penalty, blank_id)
+        ctc_encoder_out_lens = ctc_encoder_mask.squeeze(1).sum(1)
 
         # 3. LASAS AR
         fusion_layer_feats = torch.concat(layer_feats, dim=-1)
-        bimodal_feats = self.lasas_ar.forward_lasas(fusion_layer_feats, ctc_probs)
+        greedy_decoded = self.greedy_search(ctc_probs, ctc_encoder_out_lens, blank_id)
+        greedy_decoded = F.one_hot(
+            greedy_decoded, num_classes=ctc_probs.shape[-1]
+        ).float()
+        bimodal_feats = self.lasas_ar.forward_lasas(fusion_layer_feats, greedy_decoded)
 
         # 4a. Attention Encoder
         att_encoder_in = torch.concat([encoder_out, bimodal_feats], dim=-1)
@@ -303,3 +298,12 @@ class DIMNet(ASRModel):
                 infos,
             )
         return results
+
+    def greedy_search(
+        self, ctc_probs: torch.Tensor, ctc_lens: torch.Tensor, blank_id: int = 0
+    ) -> torch.Tensor:
+        batch_size, maxlen, _ = ctc_probs.shape
+        topk_index = ctc_probs.argmax(dim=2)  # (B, maxlen)
+        mask = make_pad_mask(ctc_lens, maxlen)  # (B, maxlen)
+        topk_index.masked_fill_(mask, blank_id)  # (B, maxlen)
+        return topk_index
