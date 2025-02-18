@@ -200,7 +200,7 @@ def init_speech_model(args, configs):
             **configs['ctc_encoder_conf']['efficient_conf']
             if 'efficient_conf' in configs['ctc_encoder_conf'] else {})
         lasas_ar = LASASARModel(
-            acoustic_dim=configs['encoder_conf']['output_size'] * 3,
+            acoustic_dim=configs['encoder_conf']['output_size'],
             text_dim=vocab_size,
             hidden_dim=configs['lasas_conf']['hidden_dim'],
             num_heads=configs['lasas_conf']['num_heads'],

@@ -104,7 +104,6 @@ class DIMNet(ASRModel):
 
         # 3. LASAS AR
         if self.lasas_weight != 0.0:
-            fusion_layer_feats = torch.concat(layer_feats, dim=-1)
             ctc_probs_detached = ctc_probs.detach()
             # 原论文需要GreedySearch并Regular
             greedy_decoded = self.greedy_search(
@@ -114,7 +113,7 @@ class DIMNet(ASRModel):
                 greedy_decoded, num_classes=ctc_probs_detached.shape[-1]
             ).float()
             bimodal_feats, loss_lasas = self.lasas_ar(
-                fusion_layer_feats, greedy_decoded, subdialect_lables
+                layer_feats, greedy_decoded, subdialect_lables
             )
         else:
             bimodal_feats, loss_lasas = None, None
