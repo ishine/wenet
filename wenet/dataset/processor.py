@@ -21,6 +21,7 @@ from langid.langid import LanguageIdentifier, model
 import logging
 import librosa
 import random
+import wave
 
 import torch
 from torch.nn.utils.rnn import pad_sequence
@@ -93,6 +94,25 @@ def parse_url(elem):
         raise UrlOpenError(err_msg) from ex
 
 
+def subdialect_to_index(sample):
+    subdialect_dict = {
+        "Mandarin": 0,  # 普通话
+        "Beijing": 1,  # 北京官话
+        "Jiang-Huai": 2,  # 江淮官话
+        "Jiao-Liao": 3,  # 胶辽官话
+        "Ji-Lu": 4,  # 冀鲁官话
+        "Lan-Yin": 5,  # 兰银官话
+        "Northeastern": 6,  # 东北官话
+        "Southwestern": 7,  # 西南官话
+        "Zhongyuan": 8,  # 中原官话
+    }
+
+    if "subdialect" in sample:
+        sample["subdialect"] = subdialect_dict[sample["subdialect"]]
+
+    return sample
+
+
 def parse_speaker(sample, speaker_dict):
     assert 'speaker' in sample
     speaker = sample['speaker']
@@ -153,6 +173,23 @@ def decode_wav(sample):
     del sample['wav']
     sample['wav'] = waveform  # overwrite wav
     sample['sample_rate'] = sample_rate
+    return sample
+
+
+def compute_speaking_speed(sample):
+    assert "wav" in sample
+    assert "txt" in sample
+    wav_file = sample["wav"]
+    txt = sample["txt"]
+
+    with wave.open(wav_file, "r") as wav:
+        n_frames = wav.getnframes()
+    text_length = len(txt)
+
+    # calculate speaking speed in char per frame
+    speaking_speed = n_frames / text_length if text_length > 0 else 0
+    sample["speaking_speed"] = speaking_speed
+
     return sample
 
 
@@ -577,6 +614,11 @@ def padding(data):
         speaker = torch.tensor([sample[i]['speaker'] for i in order],
                                dtype=torch.int32)
         batch['speaker'] = speaker
+    if 'subdialect' in sample[0]:
+        subdialects = torch.tensor(
+            [sample[i]["subdialect"] for i in order], dtype=torch.int64
+        )
+        batch['subdialects'] = subdialects
     return batch
 
 

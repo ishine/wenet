@@ -17,6 +17,11 @@ import torch
 
 from wenet.finetune.lora.utils import (inject_lora_to_model,
                                        mark_only_lora_as_trainable)
+from wenet.MFFDED.model import MFFDED
+from wenet.MFFDED.encoder import LayerFusionEncoder
+from wenet.DIMNet.model import DIMNet
+from wenet.DIMNet.encoder import SharedEncoder
+from wenet.DIMNet.LASAS import LASASARModel
 from wenet.k2.model import K2Model
 from wenet.paraformer.cif import Cif
 from wenet.paraformer.layers import SanmDecoder, SanmEncoder
@@ -54,6 +59,8 @@ WENET_ENCODER_CLASSES = {
     "dual_transformer": DualTransformerEncoder,
     "dual_conformer": DualConformerEncoder,
     'sanm_encoder': SanmEncoder,
+    "layer_fusion": LayerFusionEncoder,
+    "shared_encoder": SharedEncoder,
 }
 
 WENET_DECODER_CLASSES = {
@@ -86,6 +93,8 @@ WENET_MODEL_CLASSES = {
     "transducer": Transducer,
     'paraformer': Paraformer,
     'causal_llm': CausalLM,
+    "mffded": MFFDED,
+    "dimnet": DIMNet,
 }
 
 
@@ -157,6 +166,68 @@ def init_speech_model(args, configs):
             special_tokens=configs.get('tokenizer_conf',
                                        {}).get('special_tokens', None),
         )
+    elif model_type == 'mffded':
+        ctc_encoder_type = configs.get('ctc_encoder', 'transformer')
+        att_encoder_type = configs.get('att_encoder', 'transformer')
+        ctc_encoder = WENET_ENCODER_CLASSES[ctc_encoder_type](
+            configs['encoder_conf']['output_size'],
+            **configs['ctc_encoder_conf'],
+            **configs['ctc_encoder_conf']['efficient_conf']
+            if 'efficient_conf' in configs['ctc_encoder_conf'] else {})
+        att_encoder = WENET_ENCODER_CLASSES[att_encoder_type](
+            configs['encoder_conf']['output_size'] * 2,
+            **configs['att_encoder_conf'],
+            **configs['att_encoder_conf']['efficient_conf']
+            if 'efficient_conf' in configs['att_encoder_conf'] else {})
+        decoder = WENET_DECODER_CLASSES[decoder_type](vocab_size,
+                                                      encoder.output_size() * 2,
+                                                      **configs['decoder_conf'])
+        model = WENET_MODEL_CLASSES[model_type](
+            vocab_size=vocab_size,
+            encoder=encoder,
+            ctc_encoder=ctc_encoder,
+            att_encoder=att_encoder,
+            decoder=decoder,
+            ctc=ctc,
+            special_tokens=configs.get('tokenizer_conf',
+                                       {}).get('special_tokens', None),
+            **configs['model_conf'])
+    elif model_type == 'dimnet':
+        ctc_encoder_type = configs.get('ctc_encoder', 'conformer')
+        ctc_encoder = WENET_ENCODER_CLASSES[ctc_encoder_type](
+            configs['encoder_conf']['output_size'],
+            **configs['ctc_encoder_conf'],
+            **configs['ctc_encoder_conf']['efficient_conf']
+            if 'efficient_conf' in configs['ctc_encoder_conf'] else {})
+        lasas_ar = LASASARModel(
+            acoustic_dim=configs['encoder_conf']['output_size'],
+            text_dim=vocab_size,
+            hidden_dim=configs['lasas_conf']['hidden_dim'],
+            num_heads=configs['lasas_conf']['num_heads'],
+            num_classes=configs['lasas_conf']['num_classes'])
+        att_encoder_type = configs.get('att_encoder', 'conformer')
+        att_encoder = WENET_ENCODER_CLASSES[att_encoder_type](
+            configs["encoder_conf"]["output_size"] + configs["lasas_conf"]["hidden_dim"],
+            **configs["att_encoder_conf"],
+            **configs["att_encoder_conf"]["efficient_conf"]
+            if "efficient_conf" in configs["att_encoder_conf"] else {}
+        )
+        decoder = WENET_DECODER_CLASSES[decoder_type](
+            vocab_size,
+            encoder.output_size() + configs["lasas_conf"]["hidden_dim"],
+            **configs["decoder_conf"],
+        )
+        model = WENET_MODEL_CLASSES[model_type](
+            vocab_size=vocab_size,
+            shared_encoder=encoder,
+            ctc_encoder=ctc_encoder,
+            att_encoder=att_encoder,
+            att_decoder=decoder,
+            ctc=ctc,
+            lasas_ar=lasas_ar,
+            special_tokens=configs.get('tokenizer_conf',
+                                       {}).get('special_tokens', None),
+            **configs['model_conf'])
     elif model_type in WENET_SSL_MODEL_CLASS.keys():
         from wenet.ssl.init_model import init_model as init_ssl_model
         model = init_ssl_model(configs, encoder)
