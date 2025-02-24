@@ -234,6 +234,7 @@ class DIMNet(ASRModel):
             simulate_streaming,
         )
         encoder_out_lens = encoder_mask.squeeze(1).sum(1)
+
         # 2a. CTC Encoder
         ctc_encoder_out, ctc_encoder_mask = self.ctc_encoder(
             encoder_out, encoder_out_lens
@@ -244,12 +245,11 @@ class DIMNet(ASRModel):
         ctc_encoder_out_lens = ctc_encoder_mask.squeeze(1).sum(1)
 
         # 3. LASAS AR
-        fusion_layer_feats = torch.concat(layer_feats, dim=-1)
         greedy_decoded = self.greedy_search(ctc_probs, ctc_encoder_out_lens, blank_id)
         greedy_decoded = F.one_hot(
             greedy_decoded, num_classes=ctc_probs.shape[-1]
         ).float()
-        bimodal_feats = self.lasas_ar.forward_lasas(fusion_layer_feats, greedy_decoded)
+        bimodal_feats = self.lasas_ar.forward_lasas(layer_feats, greedy_decoded)
 
         # 4a. Attention Encoder
         att_encoder_in = torch.concat([encoder_out, bimodal_feats], dim=-1)
