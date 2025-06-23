@@ -12,7 +12,6 @@ Subpackages
 .. toctree::
    :maxdepth: 2
 
-   wenet.LLM
    wenet.bin
    wenet.branchformer
    wenet.cli
@@ -21,6 +20,7 @@ Subpackages
    wenet.e_branchformer
    wenet.efficient_conformer
    wenet.finetune
+   wenet.firered
    wenet.k2
    wenet.paraformer
    wenet.squeezeformer

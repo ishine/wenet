@@ -1,7 +1,7 @@
-wenet.LLM.causallm\_model module
+wenet.firered.subsampling module
 ================================
 
-.. automodule:: wenet.LLM.causallm_model
+.. automodule:: wenet.firered.subsampling
    :members:
    :undoc-members:
    :show-inheritance:
